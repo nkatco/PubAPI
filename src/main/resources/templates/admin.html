@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Raiden-Bar Admin panel</title>
+    <link type="text/css" href="/css/styles.css" rel="stylesheet" />
+<!--    <meta name="_csrf" th:content="${_csrf.token}"/>-->
+<!--    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>-->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+<div class="menu-wrapper">
+    <button class="menu-button">MENU</button>
+    <button class="events-button">EVENTS</button>
+</div>
+<button class="create-category-button">Create Category</button>
+<div class="category-modal">
+    <span class="close-category-modal">&times;</span>
+    <h2>Create Category</h2>
+    <input type="text" id="category-name-input" placeholder="Category Name">
+    <button class="save-category-button">Save</button>
+</div>
+<div class="modal-overlay"></div>
+<div class="card-wrapper">
+    <div class="card" th:each="product : ${products}">
+        <div class="card__top">
+            <a href="#" class="card__image" th:data-product-id="${product.id}">
+                <img th:data-product-id="${product.id}" th:src="@{${product.img}}"/>
+                <button class="delete-button" th:data-product-id="${product.id}">×</button>
+            </a>
+        </div>
+        <div class="card__bottom">
+            <div class="card__prices">
+                <div class="card__price card__price--common">
+                    <span class="price" th:data-product-id="${product.id}" contenteditable="true" th:text="${product.price}"></span>
+                </div>
+            </div>
+            <span class="img" th:data-product-id="${product.id}" th:text="${product.img}"></span>
+            <select class="category-select" th:id="'category-' + ${product.id}" th:name="'category-' + ${product.id}">
+                <option th:each="category : ${categories}" th:text="${category.name}" th:selected="${category.id == product.categoryId}">
+                </option>
+            </select>
+            <span class="name" th:data-product-id="${product.id}" contenteditable="true" th:text="${product.name}"></span>
+            <span class="desc" th:data-product-id="${product.id}" contenteditable="true" th:text="${product.desc}"></span>
+            <button class="save-button" th:data-product-id="${product.id}">Save</button>
+        </div>
+    </div>
+    <div class="card additional-card">
+        <div class="card_top">
+            <a href="#" class="card__image">
+                <img src="images/img.jpg">
+            </a>
+        </div>
+        <div class="card__bottom">
+            <div class="card__prices">
+                <div class="card__price card__price--common">
+                    <input type="text" class="price" placeholder="Price">
+                </div>
+            </div>
+            <select class="category-select" id="category-add" name="category-add">
+                <option value=""></option>
+                <option th:each="category : ${categories}" th:value="${category.id}" th:text="${category.name}"></option>
+            </select>
+            <input type="text" class="name" placeholder="Name">
+            <input type="text" class="desc" placeholder="Description">
+            <button class="add-button">Save</button>
+        </div>
+    </div>
+</div>
+<script th:inline="javascript">
+    $(document).ready(function() {
+        var csrfToken = $("meta[name='_csrf']").attr("content");
+        var csrfHeader = $("meta[name='_csrf_header']").attr("content");
+
+        $(".span").keypress(function(event) {
+            if (event.which === 13) {
+                event.preventDefault();
+            }
+        });
+        $(".create-category-button").click(function() {
+            $(".modal-overlay").fadeIn();
+            $(".category-modal").fadeIn();
+            $("body").addClass("modal-open");
+        });
+        $(".close-category-modal").click(function() {
+            $(".modal-overlay").fadeOut();
+            $(".category-modal").fadeOut();
+            $("body").removeClass("modal-open");
+        });
+        $(".save-category-button").click(function(event) {
+            event.preventDefault();
+
+            var categoryName = $("#category-name-input").val();
+
+            var data = {
+                name: categoryName
+            };
+
+            $.ajax({
+                type: "POST",
+                url: "/admin/create-category",
+                data: categoryName,
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                },
+                success: function(result) {
+                    console.log("Category created successfully");1
+                },
+                error: function(xhr, status, error) {
+                    console.log("Failed to create category");
+                }
+            });
+            $(".modal-overlay").fadeOut();
+            $(".category-modal").fadeOut();
+            $("body").removeClass("modal-open");
+        });
+
+        $(".delete-button").click(function() {
+            event.stopPropagation();
+
+            var productId = $(this).data("product-id");
+
+            $.ajax({
+                type: "POST",
+                url: "/admin/delete-product",
+                data: productId,
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('Content-Type', 'text/plain');
+                },
+                success: function(result) {
+                    console.log("Product deleted successfully");
+                },
+                error: function(xhr, status, error) {
+                    console.log("Failed to delete product");
+                }
+            });
+        });
+        $(".card__image").click(function (event) {
+            event.preventDefault();
+
+            var productId = $(this).data("product-id");
+
+            var fileInput = $("<input>", {
+                type: "file",
+                accept: "image/*",
+                id: "fileInput-" + productId,
+                name: "file"
+            }).hide();
+
+            fileInput.change(function () {
+                var formData = new FormData();
+                formData.append("file", $(this)[0].files[0]);
+                formData.append("productId", productId);
+
+                $.ajax({
+                    type: "POST",
+                    url: "/admin/upload",
+                    data: formData,
+                    beforeSend: function (xhr) {
+                        // xhr.setRequestHeader(csrfHeader, csrfToken);
+                    },
+                    success: function (result) {
+                        console.log("File uploaded successfully");
+
+                        var updatedProductImg = result.img;
+                        var productImgElement = $("a.card__image[data-product-id='" + productId + "'] img");
+                        productImgElement.attr("src", updatedProductImg);
+                    },
+                    error: function (xhr, status, error) {
+                        console.log("File upload failed");
+                    },
+                    processData: false,
+                    contentType: false
+                });
+            });
+
+            fileInput.click();
+        });
+        $(".add-button").click(function(event) {
+            event.preventDefault();
+
+            var name = $(".additional-card input.name").val();
+            var desc = $(".additional-card input.desc").val();
+            var price = $(".additional-card input.price").val();
+            var img = img = "images/img.jpg";
+            var categoryId = $("select#category-add option:selected").val();
+
+            if (!img) {
+                img = "images/img.jpg";
+            }
+
+            name = name ? name.trim() : "";
+            desc = desc ? desc.trim() : "";
+            price = price ? price.trim() : "";
+
+            console.log(name);
+            console.log(desc);
+            console.log(price);
+            console.log(categoryId);
+
+            var data = {
+                name: name,
+                desc: desc,
+                price: price,
+                img: img,
+                categoryId: categoryId
+            };
+
+            $.ajax({
+                type: "POST",
+                url: "/admin/save",
+                data: JSON.stringify(data),
+                beforeSend: function(xhr) {
+                    // xhr.setRequestHeader(csrfHeader, csrfToken);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                },
+                success: function(result) {
+                    console.log("Model added successfully");
+                },
+                error: function(xhr, status, error) {
+                    console.log("Failed to add model");
+                }
+            });
+        });
+        $(".save-button").click(function(event) {
+            event.preventDefault();
+            var productId = $(this).data("product-id");
+            var name = $("span.name[data-product-id='" + productId + "']").text();
+            var desc = $("span.desc[data-product-id='" + productId + "']").text();
+            var price = $("span.price[data-product-id='" + productId + "']").text();
+            var categoryId = $("select#category-" + productId + " option:selected").attr("value");
+            var img = $("img[data-product-id='" + productId + "']").text();
+
+            name = name ? name.trim() : "";
+            desc = desc ? desc.trim() : "";
+            price = price ? price.trim() : "";
+
+            console.log(name)
+            console.log(desc)
+            console.log(price)
+            console.log(categoryId)
+
+            var data = {
+                id: productId,
+                name: name,
+                desc: desc,
+                price: price,
+                categoryId: categoryId,
+                img: img
+            };
+
+            $.ajax({
+                type: "POST",
+                url: "/admin/update",
+                data: JSON.stringify(data),
+                beforeSend: function(xhr) {
+                    // xhr.setRequestHeader(csrfHeader, csrfToken);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                },
+                success: function(result) {
+                    console.log("Data updated successfully");
+                },
+                error: function(xhr, status, error) {
+                    console.log("Failed to update data");
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>
